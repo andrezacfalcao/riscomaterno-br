@@ -1,31 +1,25 @@
-# =============================================================================
-# FASE 4 - VALIDAÇÃO TÉCNICA (EDA)
-# Dataset: dataset_final_brasil (saída da Fase 3, 11.139 municípios-ano)
-# =============================================================================
-#
-# PRÉ-REQUISITO: dataset_final_brasil já carregado no ambiente
-# (ou rode: dataset_final_brasil <- readRDS("dataset_final_BRASIL.rds"))
-#
-# O QUE ESTA FASE FAZ:
-#   1. Flag de instabilidade estatística da RMM (decisão: não destrutiva)
-#   2. Estatísticas descritivas completas de todas as colunas
-#   3. Checagem final de completude (NA) na escala Brasil
-#   4. Exportação para .csv pronto para Tableau
-#
-# LIMITAÇÃO DOCUMENTADA (não corrigida nesta fase, ver nota abaixo):
-#   O piloto identificou PESO mínimo de 100g em registros individuais do
-#   SINASC -- provável erro de digitação (ex: 1000g digitado como 100g).
-#   Isso já está diluído dentro de PCT_BAIXO_PESO (proporção agregada por
-#   município-ano) e afeta poucos registros isoladamente. Não reprocessamos
-#   a Fase 2 para filtrar isso porque exigiria rodar as 27 UFs de novo por
-#   um ganho marginal -- registrar como limitação conhecida do dataset é
-#   prática aceita em Data Papers (seção "Limitations").
-# =============================================================================
+#fase 4 validação técnica (eda)
+#dataset: dataset_final_brasil (saída da fase 3, 11.139 municípios-ano)
+#pré-requisito: dataset_final_brasil já carregado no ambiente
+#(ou rode: dataset_final_brasil <- readrds("dataset_final_brasil.rds"))
+#o que esta fase faz:
+#1. flag de instabilidade estatística da rmm (decisão: não destrutiva)
+#2. estatísticas descritivas completas de todas as colunas
+#3. checagem final de completude (na) na escala brasil
+#4. exportação para .csv pronto para tableau
+#limitação documentada (não corrigida nesta fase, ver nota abaixo):
+#o piloto identificou peso mínimo de 100g em registros individuais do
+#sinasc provável erro de digitação (ex: 1000g digitado como 100g).
+#isso já está diluído dentro de pct_baixo_peso (proporção agregada por
+#município-ano) e afeta poucos registros isoladamente. não reprocessamos
+#a fase 2 para filtrar isso porque exigiria rodar as 27 ufs de novo por
+#um ganho marginal registrar como limitação conhecida do dataset é
+#prática aceita em data papers (seção "limitations").
 
 library(dplyr)
 library(ggplot2)
 
-# Torna este script autossuficiente (roda sozinho via Rscript)
+#torna este script autossuficiente (roda sozinho via rscript)
 if (!exists("dataset_final_brasil")) {
   if (file.exists("dataset_final_BRASIL.rds")) {
     dataset_final_brasil <- readRDS("dataset_final_BRASIL.rds")
@@ -35,19 +29,16 @@ if (!exists("dataset_final_brasil")) {
   }
 }
 
-# =============================================================================
-# 4.1 CLASSIFICAÇÃO DE CONFIABILIDADE DA RMM (3 níveis)
-# =============================================================================
-# Substituímos a flag binária inicial por 3 níveis, porque a validação
-# mostrou que o problema de instabilidade não tem corte limpo em 100
-# nascidos vivos -- município com 118 nascidos vivos ainda mostrou RMM de
-# 2.542 (claramente ruído estatístico de amostra pequena, não risco real).
-#
-# Limiares adotados:
-#   Baixa  : NASCIDOS_VIVOS < 100  (RMM pode chegar a milhares, ruído extremo)
-#   Média  : 100-499 nascidos vivos (ainda instável, mas menos extremo)
-#   Alta   : >= 500 nascidos vivos (amostra grande o suficiente para
-#            refletir risco real, não apenas variação por acaso)
+#4.1 classificação de confiabilidade da rmm (3 níveis)
+#substituímos a flag binária inicial por 3 níveis, porque a validação
+#mostrou que o problema de instabilidade não tem corte limpo em 100
+#nascidos vivos município com 118 nascidos vivos ainda mostrou rmm de
+#2.542 (claramente ruído estatístico de amostra pequena, não risco real).
+#limiares adotados:
+#baixa : nascidos_vivos < 100 (rmm pode chegar a milhares, ruído extremo)
+#média : 100-499 nascidos vivos (ainda instável, mas menos extremo)
+#alta : >= 500 nascidos vivos (amostra grande o suficiente para
+#refletir risco real, não apenas variação por acaso)
 
 dataset_final_brasil <- dataset_final_brasil %>%
   mutate(
@@ -59,9 +50,7 @@ dataset_final_brasil <- dataset_final_brasil %>%
     CONFIABILIDADE_RMM = factor(CONFIABILIDADE_RMM, levels = c("Baixa", "Média", "Alta"))
   )
 
-# =============================================================================
-# 4.2 ESTATÍSTICAS DESCRITIVAS COMPLETAS
-# =============================================================================
+#4.2 estatísticas descritivas completas
 
 estatisticas_descritivas <- function(df) {
   colunas_numericas <- df %>% select(where(is.numeric)) %>% names()
@@ -88,9 +77,7 @@ estatisticas_descritivas <- function(df) {
 resumo_estatistico <- estatisticas_descritivas(dataset_final_brasil)
 print(resumo_estatistico, n = Inf)
 
-# =============================================================================
-# 4.3 COMPLETUDE FINAL (escala Brasil)
-# =============================================================================
+#4.3 completude final (escala brasil)
 
 completude_final <- dataset_final_brasil %>%
   summarise(across(everything(), ~ mean(is.na(.x)) * 100)) %>%
@@ -100,9 +87,7 @@ completude_final <- dataset_final_brasil %>%
 cat("\n== Completude final (dataset_final_brasil) ==\n")
 print(completude_final, n = Inf)
 
-# =============================================================================
-# 4.4 RESUMO DA CONFIABILIDADE DA RMM (para a seção de Qualidade do artigo)
-# =============================================================================
+#4.4 resumo da confiabilidade da rmm (para a seção de qualidade do artigo)
 
 cat("\n== Distribuição por nível de confiabilidade ==\n")
 resumo_confiabilidade <- dataset_final_brasil %>%
@@ -117,9 +102,7 @@ resumo_confiabilidade <- dataset_final_brasil %>%
   )
 print(resumo_confiabilidade)
 
-# =============================================================================
-# 4.5 EXPORTAÇÃO PARA TABLEAU (.csv)
-# =============================================================================
+#4.5 exportação para tableau (.csv)
 
 write.csv(dataset_final_brasil, "dataset_final_BRASIL.csv", row.names = FALSE, fileEncoding = "UTF-8")
 cat("\n[OK] Exportado: dataset_final_BRASIL.csv (", nrow(dataset_final_brasil), "linhas,",
@@ -129,18 +112,16 @@ saveRDS(dataset_final_brasil, "dataset_final_BRASIL.rds")
 saveRDS(resumo_estatistico, "resumo_estatistico_BRASIL.rds")
 saveRDS(completude_final, "completude_final_BRASIL.rds")
 
-# =============================================================================
-# 4.6 VISUALIZAÇÃO - RMM POR NÍVEL DE CONFIABILIDADE
-# =============================================================================
-# A RMM tem muitos zeros (municípios sem óbito materno no período) e poucos
-# valores extremos -- um histograma direto ficaria dominado pela barra de
-# zero. Por isso: (a) histograma excluindo RMM=0, pra ver a forma real da
-# distribuição de quem TEVE óbito; (b) boxplot em escala log, pra comparar
-# os 3 níveis lado a lado de forma justa.
+#4.6 visualização rmm por nível de confiabilidade
+#a rmm tem muitos zeros (municípios sem óbito materno no período) e poucos
+#valores extremos um histograma direto ficaria dominado pela barra de
+#zero. por isso: (a) histograma excluindo rmm=0, pra ver a forma real da
+#distribuição de quem teve óbito; (b) boxplot em escala log, pra comparar
+#os 3 níveis lado a lado de forma justa.
 
 library(ggplot2)
 
-# (a) Histograma por nível, excluindo zeros, eixo livre (escalas bem diferentes)
+#(a) histograma por nível, excluindo zeros, eixo livre (escalas bem diferentes)
 grafico_histograma <- dataset_final_brasil %>%
   filter(RMM > 0) %>%
   ggplot(aes(x = RMM, fill = CONFIABILIDADE_RMM)) +
@@ -157,7 +138,7 @@ grafico_histograma <- dataset_final_brasil %>%
 print(grafico_histograma)
 ggsave("rmm_histograma_por_confiabilidade.png", grafico_histograma, width = 8, height = 9, dpi = 150)
 
-# (b) Boxplot comparativo em escala log (permite ver os 3 lado a lado)
+#(b) boxplot comparativo em escala log (permite ver os 3 lado a lado)
 grafico_boxplot <- dataset_final_brasil %>%
   filter(RMM > 0) %>%
   ggplot(aes(x = CONFIABILIDADE_RMM, y = RMM, fill = CONFIABILIDADE_RMM)) +

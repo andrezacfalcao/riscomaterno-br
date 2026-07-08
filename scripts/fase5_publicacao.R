@@ -1,12 +1,10 @@
-# =============================================================================
-# FASE 5 - PREPARAÇÃO PARA PUBLICAÇÃO (ZENODO)
-# Gera todos os arquivos que precisam ir no pacote de publicação
-# =============================================================================
-# PRÉ-REQUISITO: dataset_final_brasil já carregado (17 colunas)
+#fase 5 preparação para publicação (zenodo)
+#gera todos os arquivos que precisam ir no pacote de publicação
+#pré-requisito: dataset_final_brasil já carregado (17 colunas)
 
 library(dplyr)
 
-# Torna este script autossuficiente (roda sozinho via Rscript)
+#torna este script autossuficiente (roda sozinho via rscript)
 if (!exists("dataset_final_brasil")) {
   if (file.exists("dataset_final_BRASIL.rds")) {
     dataset_final_brasil <- readRDS("dataset_final_BRASIL.rds")
@@ -16,14 +14,12 @@ if (!exists("dataset_final_brasil")) {
   }
 }
 
-# Cria uma pasta só para os arquivos de publicação (organiza tudo junto)
+#cria uma pasta só para os arquivos de publicação (organiza tudo junto)
 dir.create("publicacao_zenodo", showWarnings = FALSE)
 
-# =============================================================================
-# 1. EXPORTAÇÃO DO DATASET EM MÚLTIPLOS FORMATOS
-# =============================================================================
-# .parquet -- formato recomendado (compacto, rápido, preserva tipos de dado)
-# .csv     -- formato universal (qualquer pessoa abre, até no Excel)
+#1. exportação do dataset em múltiplos formatos
+#.parquet formato recomendado (compacto, rápido, preserva tipos de dado)
+#.csv formato universal (qualquer pessoa abre, até no excel)
 
 if (!requireNamespace("arrow", quietly = TRUE)) {
   install.packages("arrow", repos = "https://cloud.r-project.org")
@@ -36,9 +32,7 @@ write.csv(dataset_final_brasil, "publicacao_zenodo/dataset_final_brasil.csv",
 
 cat("[OK] Dataset exportado em .parquet e .csv\n")
 
-# =============================================================================
-# 2. DICIONÁRIO DE DADOS EM CSV (para acompanhar o dataset)
-# =============================================================================
+#2. dicionário de dados em csv (para acompanhar o dataset)
 
 dicionario <- tibble::tribble(
   ~coluna, ~tipo, ~descricao,
@@ -65,9 +59,7 @@ dicionario <- tibble::tribble(
 write.csv(dicionario, "publicacao_zenodo/dicionario_de_dados.csv", row.names = FALSE, fileEncoding = "UTF-8")
 cat("[OK] Dicionário de dados exportado\n")
 
-# =============================================================================
-# 3. README.md PARA O REPOSITÓRIO
-# =============================================================================
+#3. readme.md para o repositório
 
 readme_texto <- '# RiscoMaterno-BR
 
@@ -113,12 +105,10 @@ CC-BY 4.0 -- uso livre com atribuição de crédito.
 writeLines(readme_texto, "publicacao_zenodo/README.md")
 cat("[OK] README.md gerado\n")
 
-# =============================================================================
-# 4. COPIA O CÓDIGO-FONTE PARA O PACOTE DE PUBLICAÇÃO (reprodutibilidade)
-# =============================================================================
-# Ajuste o caminho abaixo para onde está seu script principal
-# file.copy("pipeline_completo_final.R", "publicacao_zenodo/pipeline_completo_final.R")
-# file.copy("fase_extra_cnes.R", "publicacao_zenodo/fase_extra_cnes.R")
+#4. copia o código-fonte para o pacote de publicação (reprodutibilidade)
+#ajuste o caminho abaixo para onde está seu script principal
+#file.copy("pipeline_completo_final.r", "publicacao_zenodo/pipeline_completo_final.r")
+#file.copy("fase_extra_cnes.r", "publicacao_zenodo/fase_extra_cnes.r")
 
 cat("\n[OK] Pasta 'publicacao_zenodo' pronta com:\n")
 print(list.files("publicacao_zenodo"))

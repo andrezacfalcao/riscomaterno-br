@@ -1,22 +1,16 @@
-# =============================================================================
-# ORQUESTRAÇÃO COM DAGSTER - RiscoMaterno-BR
-# =============================================================================
-# IMPORTANTE: este arquivo NÃO reimplementa nenhuma lógica de limpeza/
-# transformação de dados. Ele só CHAMA os scripts R já validados, na ordem
-# certa, usando o Dagster como camada de orquestração (dependências, retry,
-# monitoramento visual). A lógica de negócio continua 100% em R.
-#
-# INSTALAÇÃO (rodar uma vez, no terminal):
-#   pip install dagster dagster-webserver
-#
-# COMO RODAR (no terminal, na pasta onde este arquivo e os scripts .R estão):
-#   dagster dev -f pipeline_dagster.py
-#   Depois abra http://localhost:3000 no navegador -- lá você vê o pipeline
-#   visualmente e clica em "Materialize all" para rodar tudo.
-#
-# PRÉ-REQUISITO: R e Rscript precisam estar instalados e acessíveis no PATH
-# do sistema (o mesmo R que você já usa no RStudio funciona).
-# =============================================================================
+#orquestração com dagster riscomaterno-br
+#importante: este arquivo não reimplementa nenhuma lógica de limpeza/
+#transformação de dados. ele só chama os scripts r já validados, na ordem
+#certa, usando o dagster como camada de orquestração (dependências, retry,
+#monitoramento visual). a lógica de negócio continua 100% em r.
+#instalação (rodar uma vez, no terminal):
+#pip install dagster dagster-webserver
+#como rodar (no terminal, na pasta onde este arquivo e os scripts .r estão):
+#dagster dev -f pipeline_dagster.py
+#depois abra http://localhost:3000 no navegador lá você vê o pipeline
+#visualmente e clica em "materialize all" para rodar tudo.
+#pré-requisito: r e rscript precisam estar instalados e acessíveis no path
+#do sistema (o mesmo r que você já usa no rstudio funciona).
 
 import subprocess
 from dagster import op, job, In, Out, Nothing, get_dagster_logger
@@ -47,10 +41,8 @@ def rodar_script_r(nome_arquivo: str) -> str:
     return resultado.stdout
 
 
-# =============================================================================
-# CADA @op abaixo corresponde a UMA FASE já existente do pipeline R.
-# Ajuste os nomes de arquivo se os seus scripts estiverem em outra pasta.
-# =============================================================================
+#cada @op abaixo corresponde a uma fase já existente do pipeline r.
+#ajuste os nomes de arquivo se os seus scripts estiverem em outra pasta.
 
 @op
 def extrair_e_integrar_sinasc_sim() -> str:
@@ -92,11 +84,9 @@ def preparar_publicacao() -> str:
     return rodar_script_r("fase5_publicacao.R")
 
 
-# =============================================================================
-# O JOB define a ORDEM DE DEPENDÊNCIA entre as fases -- isso é literalmente
-# o "DAG" (Directed Acyclic Graph) que a disciplina pede: cada fase só começa
-# depois que a anterior terminar com sucesso.
-# =============================================================================
+#o job define a ordem de dependência entre as fases isso é literalmente
+#o "dag" (directed acyclic graph) que a disciplina pede: cada fase só começa
+#depois que a anterior terminar com sucesso.
 
 @job
 def pipeline_riscomaterno_br():

@@ -1,75 +1,59 @@
-# =============================================================================
-# PIPELINE COMPLETO E DEFINITIVO
-# Dataset de Risco Socioespacial e Desfechos Materno-Infantis (SINASC + SIM)
-# DSW/SBBD 2025
-# =============================================================================
-#
-# ESTRUTURA DESTE ARQUIVO:
-#   PARTE 0 - Setup
-#   PARTE 1 - Funções reutilizáveis (Fase 2 + Fase 3)
-#   PARTE 2 - Bloco Piloto PE           [HISTÓRICO/COMENTADO -- já validado]
-#   PARTE 3 - Bloco Regional Nordeste   [HISTÓRICO/COMENTADO -- já validado]
-#   PARTE 4 - Bloco Oficial Brasil (27 UFs)                    [ATIVO -- RODAR]
-#   PARTE 5 - Fase 4: Validação Técnica (EDA)                  [ATIVO -- RODAR]
-#   PARTE 6 - Fase 5: Carga e Publicação          [AINDA NÃO IMPLEMENTADA]
-#
-# COMO USAR AGORA:
-#   1) Rode PARTE 0 e PARTE 1 (setup + funções) -- sempre primeiro.
-#   2) NÃO precisa rodar PARTE 2 nem PARTE 3 -- estão comentadas, servem só
-#      de registro histórico de como validamos o pipeline em etapas
-#      (PE -> Nordeste -> Brasil) antes de rodar em escala nacional direta.
-#   3) Apague os checkpoints antigos (a função de agregação mudou -- ver
-#      instrução no início da PARTE 4) e rode a PARTE 4 (Brasil completo).
-#   4) Rode a PARTE 5 (Fase 4: EDA) em seguida, usando o dataset_final_brasil
-#      gerado na PARTE 4.
-#
-# =============================================================================
-# HISTÓRICO DE ACHADOS DE VALIDAÇÃO (documentar no artigo, seção Qualidade)
-# =============================================================================
-#   1) CONSULTAS usa rótulos "1 a 3 vezes" / "4 a 6 vezes" / "7 ou mais vezes"
-#      / "Nenhuma" (não "de 1 a 3 consultas", como assumido inicialmente).
-#
-#   2) OBITOPARTO NÃO é campo de óbito materno -- pertence à investigação de
-#      óbito FETAL/INFANTIL (timing da morte do bebê em relação ao parto).
-#      Incluí-lo por engano numa versão anterior inflou o resultado de forma
-#      incorreta (150 -> 1496 óbitos maternos). Corrigido: só OBITOGRAV e
-#      OBITOPUERP são válidos para a definição ampliada de óbito materno.
-#        OBITOGRAV:  "Sim"/"Não" (binário normal)
-#        OBITOPUERP: "De 0 a 42 dias"/"De 43 dias a 1 ano"/"Não"/NA
-#                     (as duas primeiras categorias = afirmativo)
-#
-#   3) process_sinasc() zera 100% do campo PESO (bug do pacote microdatasus).
-#      Corrigido restaurando o valor a partir do dado bruto (corrigir_peso()).
-#
-#   4) Códigos de município terminados em "0000" (ex: "260000" em PE)
-#      representam "município ignorado", não uma cidade real -- removidos
-#      via remover_municipio_placeholder().
-#
-#   5) Download de UFs grandes (SP) pode estourar o timeout padrão do R
-#      (240s) por causa do tamanho do arquivo (~24MB). Corrigido com
-#      options(timeout = 600) na Parte 0.
-#
-#   6) RMM (Razão de Mortalidade Materna) é estatisticamente instável em
-#      municípios com poucos nascidos vivos -- um só óbito num município
-#      pequeno gera RMM de milhares. Não existe corte limpo (município com
-#      118 nascidos vivos ainda mostrou RMM de 2.542). Tratamento adotado:
-#      classificação em 3 níveis de confiabilidade (não destrutiva -- ver
-#      CONFIABILIDADE_RMM na Fase 4), em vez de uma flag binária ou de
-#      remover/suprimir os dados.
-#
-#   7) PESO mínimo observado de 100g em registros individuais do SINASC --
-#      abaixo do limite de viabilidade neonatal reconhecido (~245g é o
-#      recorde mundial de sobrevivência), quase certamente erro de
-#      digitação no preenchimento original da Declaração de Nascido Vivo.
-#      NÃO CORRIGIMOS O VALOR (o dado original do SUS nunca é alterado) --
-#      apenas sinalizamos com a flag TEM_PESO_IMPLAUSIVEL (< 300g), calculada
-#      durante a agregação por município-ano.
-# =============================================================================
+#pipeline completo e definitivo
+#dataset de risco socioespacial e desfechos materno-infantis (sinasc + sim)
+#dsw/sbbd 2025
+#estrutura deste arquivo:
+#parte 0 setup
+#parte 1 funções reutilizáveis (fase 2 + fase 3)
+#parte 2 bloco piloto pe [histórico/comentado já validado]
+#parte 3 bloco regional nordeste [histórico/comentado já validado]
+#parte 4 bloco oficial brasil (27 ufs) [ativo rodar]
+#parte 5 fase 4: validação técnica (eda) [ativo rodar]
+#parte 6 fase 5: carga e publicação [ainda não implementada]
+#como usar agora:
+#1) rode parte 0 e parte 1 (setup + funções) sempre primeiro.
+#2) não precisa rodar parte 2 nem parte 3 estão comentadas, servem só
+#de registro histórico de como validamos o pipeline em etapas
+#(pe -> nordeste -> brasil) antes de rodar em escala nacional direta.
+#3) apague os checkpoints antigos (a função de agregação mudou ver
+#instrução no início da parte 4) e rode a parte 4 (brasil completo).
+#4) rode a parte 5 (fase 4: eda) em seguida, usando o dataset_final_brasil
+#gerado na parte 4.
+#histórico de achados de validação (documentar no artigo, seção qualidade)
+#1) consultas usa rótulos "1 a 3 vezes" / "4 a 6 vezes" / "7 ou mais vezes"
+#/ "nenhuma" (não "de 1 a 3 consultas", como assumido inicialmente).
+#2) obitoparto não é campo de óbito materno pertence à investigação de
+#óbito fetal/infantil (timing da morte do bebê em relação ao parto).
+#incluí-lo por engano numa versão anterior inflou o resultado de forma
+#incorreta (150 -> 1496 óbitos maternos). corrigido: só obitograv e
+#obitopuerp são válidos para a definição ampliada de óbito materno.
+#obitograv: "sim"/"não" (binário normal)
+#obitopuerp: "de 0 a 42 dias"/"de 43 dias a 1 ano"/"não"/na
+#(as duas primeiras categorias = afirmativo)
+#3) process_sinasc() zera 100% do campo peso (bug do pacote microdatasus).
+#corrigido restaurando o valor a partir do dado bruto (corrigir_peso()).
+#4) códigos de município terminados em "0000" (ex: "260000" em pe)
+#representam "município ignorado", não uma cidade real removidos
+#via remover_municipio_placeholder().
+#5) download de ufs grandes (sp) pode estourar o timeout padrão do r
+#(240s) por causa do tamanho do arquivo (24mb). corrigido com
+#options(timeout = 600) na parte 0.
+#6) rmm (razão de mortalidade materna) é estatisticamente instável em
+#municípios com poucos nascidos vivos um só óbito num município
+#pequeno gera rmm de milhares. não existe corte limpo (município com
+#118 nascidos vivos ainda mostrou rmm de 2.542). tratamento adotado:
+#classificação em 3 níveis de confiabilidade (não destrutiva ver
+#confiabilidade_rmm na fase 4), em vez de uma flag binária ou de
+#remover/suprimir os dados.
+#7) peso mínimo observado de 100g em registros individuais do sinasc
+#abaixo do limite de viabilidade neonatal reconhecido (245g é o
+#recorde mundial de sobrevivência), quase certamente erro de
+#digitação no preenchimento original da declaração de nascido vivo.
+#não corrigimos o valor (o dado original do sus nunca é alterado)
+#apenas sinalizamos com a flag tem_peso_implausivel (< 300g), calculada
+#durante a agregação por município-ano.
 
 
-# #############################################################################
-# PARTE 0 - SETUP
-# #############################################################################
+#parte 0 setup
 
 library(microdatasus)
 library(dplyr)
@@ -78,26 +62,24 @@ library(stringr)
 library(tidyr)
 library(ggplot2)
 
-# Timeout maior para evitar falha de download em UFs grandes (achado 5)
+#timeout maior para evitar falha de download em ufs grandes (achado 5)
 options(timeout = 600)
 
 
-# #############################################################################
-# PARTE 1 - FUNÇÕES REUTILIZÁVEIS (FASE 2 + FASE 3)
-# Nenhuma função aqui referencia UF nem ano específicos -- funcionam iguais
-# para qualquer escala (piloto, regional ou nacional).
-# #############################################################################
+#parte 1 funções reutilizáveis (fase 2 + fase 3)
+#nenhuma função aqui referencia uf nem ano específicos funcionam iguais
+#para qualquer escala (piloto, regional ou nacional).
 
-# ---- FASE 2: Transformação e Limpeza ---------------------------------------
+#fase 2: transformação e limpeza
 
-# 1.1 Corrige o bug conhecido do PESO no process_sinasc() (achado 3)
+#1.1 corrige o bug conhecido do peso no process_sinasc() (achado 3)
 corrigir_peso <- function(dados_sinasc_processado, dados_sinasc_brutos) {
   stopifnot(nrow(dados_sinasc_brutos) == nrow(dados_sinasc_processado))
   dados_sinasc_processado$PESO <- as.numeric(dados_sinasc_brutos$PESO)
   dados_sinasc_processado
 }
 
-# 1.2 Padronização de tipos e datas
+#1.2 padronização de tipos e datas
 padronizar_sinasc <- function(df) {
   df %>%
     mutate(
@@ -122,12 +104,12 @@ padronizar_sim <- function(df) {
     )
 }
 
-# 1.3 Remoção de códigos de município placeholder "ignorado" (achado 4)
+#1.3 remoção de códigos de município placeholder "ignorado" (achado 4)
 remover_municipio_placeholder <- function(df) {
   df %>% filter(!str_detect(CODMUNRES, "0000$"))
 }
 
-# 1.4 Tratamento de valores ignorados (9, 99, "Ignorado") -> NA
+#1.4 tratamento de valores ignorados (9, 99, "ignorado") -> na
 tratar_ignorados <- function(df, colunas) {
   valores_ignorados <- c("Ignorado", "Ignorada", "9", "99", "999", "Não Informado", "")
   df %>%
@@ -141,8 +123,8 @@ tratar_ignorados <- function(df, colunas) {
     ))
 }
 
-# 1.5 Identificação de óbito materno -- definição dupla: CID + ampliada
-# (achado 2: OBITOPARTO excluído de propósito)
+#1.5 identificação de óbito materno definição dupla: cid + ampliada
+#(achado 2: obitoparto excluído de propósito)
 identificar_obito_materno <- function(df) {
   df %>%
     mutate(
@@ -158,12 +140,12 @@ identificar_obito_materno <- function(df) {
     )
 }
 
-# 1.6 Agregação por município-ano
-# TEM_PESO_IMPLAUSIVEL (achado 7): sinaliza município-ano com pelo menos 1
-# registro de peso ao nascer abaixo de 300g -- território de erro de
-# digitação, não de bebê extremamente prematuro real (que tipicamente fica
-# entre 500-999g). Não removemos nem corrigimos o valor original -- só
-# sinalizamos, mesmo princípio não destrutivo usado na CONFIABILIDADE_RMM.
+#1.6 agregação por município-ano
+#tem_peso_implausivel (achado 7): sinaliza município-ano com pelo menos 1
+#registro de peso ao nascer abaixo de 300g território de erro de
+#digitação, não de bebê extremamente prematuro real (que tipicamente fica
+#entre 500-999g). não removemos nem corrigimos o valor original só
+#sinalizamos, mesmo princípio não destrutivo usado na confiabilidade_rmm.
 agregar_sinasc <- function(dados_sinasc) {
   dados_sinasc %>%
     group_by(COD_UF, CODMUNRES, ANO_NASC) %>%
@@ -191,7 +173,7 @@ agregar_sim <- function(dados_sim) {
     rename(ANO_NASC = ANO_OBITO)
 }
 
-# 1.7 Relatório de completude (insumo direto pra seção "Qualidade")
+#1.7 relatório de completude (insumo direto pra seção "qualidade")
 relatorio_completude <- function(df, nome_base) {
   df %>%
     summarise(across(everything(), ~ mean(is.na(.x)) * 100)) %>%
@@ -200,7 +182,7 @@ relatorio_completude <- function(df, nome_base) {
     arrange(desc(pct_na))
 }
 
-# 1.8 Checklist de validação automática -- Fase 2
+#1.8 checklist de validação automática fase 2
 validar_fase2 <- function(dados_sinasc, dados_sim, sinasc_agregado, sim_agregado) {
   cat("=====================================================\n")
   cat("        CHECKLIST DE VALIDAÇÃO - FASE 2\n")
@@ -256,9 +238,9 @@ validar_fase2 <- function(dados_sinasc, dados_sim, sinasc_agregado, sim_agregado
   cat("=====================================================\n")
 }
 
-# ---- FASE 3: Integração (Join) ---------------------------------------------
+#fase 3: integração (join)
 
-# 1.9 Join SINASC + SIM por município-ano e cálculo da RMM
+#1.9 join sinasc + sim por município-ano e cálculo da rmm
 integrar_sinasc_sim <- function(sinasc_agregado, sim_agregado) {
   sinasc_agregado %>%
     left_join(
@@ -274,7 +256,7 @@ integrar_sinasc_sim <- function(sinasc_agregado, sim_agregado) {
     arrange(CODMUNRES, ANO_NASC)
 }
 
-# 1.10 Checklist de validação automática -- Fase 3
+#1.10 checklist de validação automática fase 3
 validar_fase3 <- function(dataset_final, sinasc_agregado) {
   cat("=====================================================\n")
   cat("        CHECKLIST DE VALIDAÇÃO - FASE 3\n")
@@ -324,122 +306,97 @@ validar_fase3 <- function(dataset_final, sinasc_agregado) {
 }
 
 
-# #############################################################################
-# PARTE 2 - BLOCO PILOTO PE (2022-2023)
-# =============================================================================
-# HISTÓRICO -- JÁ VALIDADO E SUPERADO. Mantido comentado só como registro de
-# reprodutibilidade (mostra como o pipeline foi testado numa escala pequena
-# antes de escalar). NÃO PRECISA RODAR -- os dados de PE já estão incluídos
-# no bloco oficial Brasil (Parte 4).
-# =============================================================================
+#parte 2 bloco piloto pe (2022-2023)
+#histórico já validado e superado. mantido comentado só como registro de
+#reprodutibilidade (mostra como o pipeline foi testado numa escala pequena
+#antes de escalar). não precisa rodar os dados de pe já estão incluídos
+#no bloco oficial brasil (parte 4).
 
-# uf_piloto <- "PE"
-# ano_inicio_piloto <- 2022
-# ano_fim_piloto <- 2023
-#
-# sinasc_brutos_pe <- fetch_datasus(year_start = ano_inicio_piloto, year_end = ano_fim_piloto,
-#                                    uf = uf_piloto, information_system = "SINASC")
-# sim_brutos_pe <- fetch_datasus(year_start = ano_inicio_piloto, year_end = ano_fim_piloto,
-#                                 uf = uf_piloto, information_system = "SIM-DO")
-#
-# sinasc_pe <- process_sinasc(sinasc_brutos_pe)
-# sinasc_pe <- corrigir_peso(sinasc_pe, sinasc_brutos_pe)
-# sinasc_pe <- padronizar_sinasc(sinasc_pe)
-# sinasc_pe <- remover_municipio_placeholder(sinasc_pe)
-# sinasc_pe <- tratar_ignorados(sinasc_pe, intersect(
-#   c("PARTO", "CONSULTAS", "GESTACAO", "GRAVIDEZ", "ESCMAE", "RACACOR", "SEXO", "LOCNASC"),
-#   names(sinasc_pe)
-# ))
-# sinasc_pe <- sinasc_pe %>% mutate(IDADEMAE = if_else(IDADEMAE < 9 | IDADEMAE > 60, NA_real_, IDADEMAE))
-#
-# sim_pe <- process_sim(sim_brutos_pe)
-# sim_pe <- padronizar_sim(sim_pe)
-# sim_pe <- remover_municipio_placeholder(sim_pe)
-# sim_pe <- tratar_ignorados(sim_pe, intersect(
-#   c("RACACOR", "ESC", "ASSISTMED", "CIRCOBITO", "SEXO"),
-#   names(sim_pe)
-# ))
-# sim_pe <- identificar_obito_materno(sim_pe)
-#
-# sinasc_municipio_pe <- agregar_sinasc(sinasc_pe)
-# sim_municipio_pe <- agregar_sim(sim_pe)
-#
-# validar_fase2(sinasc_pe, sim_pe, sinasc_municipio_pe, sim_municipio_pe)
-#
-# dataset_final_pe <- integrar_sinasc_sim(sinasc_municipio_pe, sim_municipio_pe)
-# validar_fase3(dataset_final_pe, sinasc_municipio_pe)
-#
-# saveRDS(dataset_final_pe, "dataset_final_PE.rds")
+#uf_piloto <- "pe"
+#ano_inicio_piloto <- 2022
+#ano_fim_piloto <- 2023
+#sinasc_brutos_pe <- fetch_datasus(year_start = ano_inicio_piloto, year_end = ano_fim_piloto,
+#uf = uf_piloto, information_system = "sinasc")
+#sim_brutos_pe <- fetch_datasus(year_start = ano_inicio_piloto, year_end = ano_fim_piloto,
+#uf = uf_piloto, information_system = "sim-do")
+#sinasc_pe <- process_sinasc(sinasc_brutos_pe)
+#sinasc_pe <- corrigir_peso(sinasc_pe, sinasc_brutos_pe)
+#sinasc_pe <- padronizar_sinasc(sinasc_pe)
+#sinasc_pe <- remover_municipio_placeholder(sinasc_pe)
+#sinasc_pe <- tratar_ignorados(sinasc_pe, intersect(
+#c("parto", "consultas", "gestacao", "gravidez", "escmae", "racacor", "sexo", "locnasc"),
+#names(sinasc_pe)
+#))
+#sinasc_pe <- sinasc_pe %>% mutate(idademae = if_else(idademae < 9 | idademae > 60, na_real_, idademae))
+#sim_pe <- process_sim(sim_brutos_pe)
+#sim_pe <- padronizar_sim(sim_pe)
+#sim_pe <- remover_municipio_placeholder(sim_pe)
+#sim_pe <- tratar_ignorados(sim_pe, intersect(
+#c("racacor", "esc", "assistmed", "circobito", "sexo"),
+#names(sim_pe)
+#))
+#sim_pe <- identificar_obito_materno(sim_pe)
+#sinasc_municipio_pe <- agregar_sinasc(sinasc_pe)
+#sim_municipio_pe <- agregar_sim(sim_pe)
+#validar_fase2(sinasc_pe, sim_pe, sinasc_municipio_pe, sim_municipio_pe)
+#dataset_final_pe <- integrar_sinasc_sim(sinasc_municipio_pe, sim_municipio_pe)
+#validar_fase3(dataset_final_pe, sinasc_municipio_pe)
+#saverds(dataset_final_pe, "dataset_final_pe.rds")
 
 
-# #############################################################################
-# PARTE 3 - BLOCO REGIONAL NORDESTE (9 UFs)
-# =============================================================================
-# HISTÓRICO -- JÁ VALIDADO E SUPERADO. Foi a etapa intermediária entre o
-# piloto PE e a rodada nacional completa (validou o pipeline em 9 estados
-# diversos, com contagem de municípios batendo 100% com o IBGE). Mantido
-# comentado só como registro. NÃO PRECISA RODAR -- os dados do Nordeste já
-# estão incluídos no bloco oficial Brasil (Parte 4).
-# =============================================================================
+#parte 3 bloco regional nordeste (9 ufs)
+#histórico já validado e superado. foi a etapa intermediária entre o
+#piloto pe e a rodada nacional completa (validou o pipeline em 9 estados
+#diversos, com contagem de municípios batendo 100% com o ibge). mantido
+#comentado só como registro. não precisa rodar os dados do nordeste já
+#estão incluídos no bloco oficial brasil (parte 4).
 
-# ufs_nordeste <- c("AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE")
-#
-# dir.create("checkpoints_nordeste", showWarnings = FALSE)
-#
-# for (uf_atual in ufs_nordeste) {
-#   arquivo_sinasc <- file.path("checkpoints_nordeste", paste0("sinasc_", uf_atual, ".rds"))
-#   arquivo_sim    <- file.path("checkpoints_nordeste", paste0("sim_", uf_atual, ".rds"))
-#
-#   if (file.exists(arquivo_sinasc) && file.exists(arquivo_sim)) next
-#
-#   tryCatch({
-#     sb <- fetch_datasus(year_start = 2022, year_end = 2023, uf = uf_atual, information_system = "SINASC")
-#     s  <- process_sinasc(sb)
-#     s  <- corrigir_peso(s, sb)
-#     s  <- padronizar_sinasc(s)
-#     s  <- remover_municipio_placeholder(s)
-#     s  <- tratar_ignorados(s, intersect(
-#            c("PARTO","CONSULTAS","GESTACAO","GRAVIDEZ","ESCMAE","RACACOR","SEXO","LOCNASC"),
-#            names(s)))
-#     s  <- s %>% mutate(IDADEMAE = if_else(IDADEMAE < 9 | IDADEMAE > 60, NA_real_, IDADEMAE))
-#     s_agregado <- agregar_sinasc(s)
-#
-#     mb <- fetch_datasus(year_start = 2022, year_end = 2023, uf = uf_atual, information_system = "SIM-DO")
-#     m  <- process_sim(mb)
-#     m  <- padronizar_sim(m)
-#     m  <- remover_municipio_placeholder(m)
-#     m  <- tratar_ignorados(m, intersect(
-#            c("RACACOR","ESC","ASSISTMED","CIRCOBITO","SEXO"), names(m)))
-#     m  <- identificar_obito_materno(m)
-#     m_agregado <- agregar_sim(m)
-#
-#     saveRDS(s_agregado, arquivo_sinasc)
-#     saveRDS(m_agregado, arquivo_sim)
-#   }, error = function(e) cat("ERRO na UF", uf_atual, ":", conditionMessage(e), "\n"))
-# }
-#
-# arquivos_sinasc_ne <- list.files("checkpoints_nordeste", pattern = "^sinasc_.*\\.rds$", full.names = TRUE)
-# arquivos_sim_ne    <- list.files("checkpoints_nordeste", pattern = "^sim_.*\\.rds$", full.names = TRUE)
-# sinasc_municipio_nordeste <- bind_rows(lapply(arquivos_sinasc_ne, readRDS))
-# sim_municipio_nordeste    <- bind_rows(lapply(arquivos_sim_ne, readRDS))
-# dataset_final_nordeste <- integrar_sinasc_sim(sinasc_municipio_nordeste, sim_municipio_nordeste)
-# validar_fase3(dataset_final_nordeste, sinasc_municipio_nordeste)
-# saveRDS(dataset_final_nordeste, "dataset_final_NORDESTE.rds")
+#ufs_nordeste <- c("al", "ba", "ce", "ma", "pb", "pe", "pi", "rn", "se")
+#dir.create("checkpoints_nordeste", showwarnings = false)
+#for (uf_atual in ufs_nordeste) {
+#arquivo_sinasc <- file.path("checkpoints_nordeste", paste0("sinasc_", uf_atual, ".rds"))
+#arquivo_sim <- file.path("checkpoints_nordeste", paste0("sim_", uf_atual, ".rds"))
+#if (file.exists(arquivo_sinasc) && file.exists(arquivo_sim)) next
+#trycatch({
+#sb <- fetch_datasus(year_start = 2022, year_end = 2023, uf = uf_atual, information_system = "sinasc")
+#s <- process_sinasc(sb)
+#s <- corrigir_peso(s, sb)
+#s <- padronizar_sinasc(s)
+#s <- remover_municipio_placeholder(s)
+#s <- tratar_ignorados(s, intersect(
+#c("parto","consultas","gestacao","gravidez","escmae","racacor","sexo","locnasc"),
+#names(s)))
+#s <- s %>% mutate(idademae = if_else(idademae < 9 | idademae > 60, na_real_, idademae))
+#s_agregado <- agregar_sinasc(s)
+#mb <- fetch_datasus(year_start = 2022, year_end = 2023, uf = uf_atual, information_system = "sim-do")
+#m <- process_sim(mb)
+#m <- padronizar_sim(m)
+#m <- remover_municipio_placeholder(m)
+#m <- tratar_ignorados(m, intersect(
+#c("racacor","esc","assistmed","circobito","sexo"), names(m)))
+#m <- identificar_obito_materno(m)
+#m_agregado <- agregar_sim(m)
+#saverds(s_agregado, arquivo_sinasc)
+#saverds(m_agregado, arquivo_sim)
+#}, error = function(e) cat("erro na uf", uf_atual, ":", conditionmessage(e), "\n"))
+#}
+#arquivos_sinasc_ne <- list.files("checkpoints_nordeste", pattern = "^sinasc_.*\\.rds$", full.names = true)
+#arquivos_sim_ne <- list.files("checkpoints_nordeste", pattern = "^sim_.*\\.rds$", full.names = true)
+#sinasc_municipio_nordeste <- bind_rows(lapply(arquivos_sinasc_ne, readrds))
+#sim_municipio_nordeste <- bind_rows(lapply(arquivos_sim_ne, readrds))
+#dataset_final_nordeste <- integrar_sinasc_sim(sinasc_municipio_nordeste, sim_municipio_nordeste)
+#validar_fase3(dataset_final_nordeste, sinasc_municipio_nordeste)
+#saverds(dataset_final_nordeste, "dataset_final_nordeste.rds")
 
 
-# #############################################################################
-# PARTE 4 - BLOCO OFICIAL BRASIL (27 UFs) -- ATIVO, RODAR AGORA
-# =============================================================================
-# IMPORTANTE: a função agregar_sinasc() mudou (ganhou TEM_PESO_IMPLAUSIVEL),
-# então checkpoints antigos estão desatualizados. Rode isto ANTES do loop:
-#
-#   unlink("checkpoints_nordeste", recursive = TRUE)
-#   unlink("checkpoints_brasil", recursive = TRUE)
-#
-# Desenho: loop UF por UF com checkpoint individual em disco (retomável em
-# caso de queda de conexão -- se cair no meio, rode o loop de novo e ele
-# pula as UFs já processadas).
-# #############################################################################
+#parte 4 bloco oficial brasil (27 ufs) ativo, rodar agora
+#importante: a função agregar_sinasc() mudou (ganhou tem_peso_implausivel),
+#então checkpoints antigos estão desatualizados. rode isto antes do loop:
+#unlink("checkpoints_nordeste", recursive = true)
+#unlink("checkpoints_brasil", recursive = true)
+#desenho: loop uf por uf com checkpoint individual em disco (retomável em
+#caso de queda de conexão se cair no meio, rode o loop de novo e ele
+#pula as ufs já processadas).
 
 ufs_brasil <- c("AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS",
                 "MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC",
@@ -502,7 +459,7 @@ sim_municipio_brasil    <- bind_rows(lapply(arquivos_sim_br, readRDS))
 
 dataset_final_brasil <- integrar_sinasc_sim(sinasc_municipio_brasil, sim_municipio_brasil)
 
-# >>> RODAR E COLAR O OUTPUT NA CONVERSA <<<
+#>>> rodar e colar o output na conversa <<<
 validar_fase3(dataset_final_brasil, sinasc_municipio_brasil)
 
 saveRDS(dataset_final_brasil, "dataset_final_BRASIL.rds")
@@ -511,18 +468,15 @@ cat("Municípios-ano por UF:\n")
 print(table(dataset_final_brasil$COD_UF))
 
 
-# #############################################################################
-# PARTE 5 - FASE 4: VALIDAÇÃO TÉCNICA (EDA) -- ATIVO, RODAR EM SEGUIDA
-# =============================================================================
-# PRÉ-REQUISITO: dataset_final_brasil já carregado (saída da Parte 4, ou
-# readRDS("dataset_final_BRASIL.rds")).
-# =============================================================================
+#parte 5 fase 4: validação técnica (eda) ativo, rodar em seguida
+#pré-requisito: dataset_final_brasil já carregado (saída da parte 4, ou
+#readrds("dataset_final_brasil.rds")).
 
-# ---- 5.1 Classificação de confiabilidade da RMM (3 níveis, achado 6) -------
-# Baixa  : NASCIDOS_VIVOS < 100  (RMM pode chegar a milhares, ruído extremo)
-# Média  : 100-499 nascidos vivos (ainda instável, mas menos extremo)
-# Alta   : >= 500 nascidos vivos (amostra grande o suficiente pra refletir
-#          risco real, não apenas variação por acaso)
+#5.1 classificação de confiabilidade da rmm (3 níveis, achado 6)
+#baixa : nascidos_vivos < 100 (rmm pode chegar a milhares, ruído extremo)
+#média : 100-499 nascidos vivos (ainda instável, mas menos extremo)
+#alta : >= 500 nascidos vivos (amostra grande o suficiente pra refletir
+#risco real, não apenas variação por acaso)
 
 dataset_final_brasil <- dataset_final_brasil %>%
   mutate(
@@ -534,7 +488,7 @@ dataset_final_brasil <- dataset_final_brasil %>%
     CONFIABILIDADE_RMM = factor(CONFIABILIDADE_RMM, levels = c("Baixa", "Média", "Alta"))
   )
 
-# ---- 5.2 Estatísticas descritivas completas --------------------------------
+#5.2 estatísticas descritivas completas
 
 estatisticas_descritivas <- function(df) {
   colunas_numericas <- df %>% select(where(is.numeric)) %>% names()
@@ -561,7 +515,7 @@ estatisticas_descritivas <- function(df) {
 resumo_estatistico <- estatisticas_descritivas(dataset_final_brasil)
 print(resumo_estatistico, n = Inf)
 
-# ---- 5.3 Completude final (escala Brasil) ----------------------------------
+#5.3 completude final (escala brasil)
 
 completude_final <- dataset_final_brasil %>%
   summarise(across(everything(), ~ mean(is.na(.x)) * 100)) %>%
@@ -571,7 +525,7 @@ completude_final <- dataset_final_brasil %>%
 cat("\n== Completude final (dataset_final_brasil) ==\n")
 print(completude_final, n = Inf)
 
-# ---- 5.4 Resumo por nível de confiabilidade da RMM -------------------------
+#5.4 resumo por nível de confiabilidade da rmm
 
 cat("\n== Distribuição por nível de confiabilidade ==\n")
 resumo_confiabilidade <- dataset_final_brasil %>%
@@ -586,7 +540,7 @@ resumo_confiabilidade <- dataset_final_brasil %>%
   )
 print(resumo_confiabilidade)
 
-# ---- 5.5 Resumo de peso implausível (achado 7) -----------------------------
+#5.5 resumo de peso implausível (achado 7)
 
 cat("\n== Município-ano com peso implausível (< 300g em algum registro) ==\n")
 n_implausivel <- sum(dataset_final_brasil$TEM_PESO_IMPLAUSIVEL)
@@ -594,11 +548,11 @@ cat("Total:", n_implausivel, "de", nrow(dataset_final_brasil),
     sprintf("(%.2f%%)\n", 100 * n_implausivel / nrow(dataset_final_brasil)))
 cat("(dado original do SUS preservado -- apenas sinalizado, não corrigido)\n")
 
-# ---- 5.6 Visualização: RMM por nível de confiabilidade ---------------------
-# A RMM tem muitos zeros e poucos valores extremos -- histograma direto
-# ficaria dominado pela barra de zero. Por isso: (a) histograma excluindo
-# zeros, pra ver a forma real da distribuição; (b) boxplot em escala log,
-# pra comparar os 3 níveis lado a lado de forma justa.
+#5.6 visualização: rmm por nível de confiabilidade
+#a rmm tem muitos zeros e poucos valores extremos histograma direto
+#ficaria dominado pela barra de zero. por isso: (a) histograma excluindo
+#zeros, pra ver a forma real da distribuição; (b) boxplot em escala log,
+#pra comparar os 3 níveis lado a lado de forma justa.
 
 grafico_histograma <- dataset_final_brasil %>%
   filter(RMM > 0) %>%
@@ -633,7 +587,7 @@ ggsave("rmm_boxplot_por_confiabilidade.png", grafico_boxplot, width = 7, height 
 
 cat("\n[OK] Gráficos salvos: rmm_histograma_por_confiabilidade.png e rmm_boxplot_por_confiabilidade.png\n")
 
-# ---- 5.7 Exportação para Tableau (.csv) -------------------------------------
+#5.7 exportação para tableau (.csv)
 
 write.csv(dataset_final_brasil, "dataset_final_BRASIL.csv", row.names = FALSE, fileEncoding = "UTF-8")
 cat("\n[OK] Exportado: dataset_final_BRASIL.csv (", nrow(dataset_final_brasil), "linhas,",
@@ -645,14 +599,11 @@ saveRDS(completude_final, "completude_final_BRASIL.rds")
 saveRDS(resumo_confiabilidade, "resumo_confiabilidade_BRASIL.rds")
 
 
-# #############################################################################
-# PARTE 6 - FASE 5: CARGA E PUBLICAÇÃO -- AINDA NÃO IMPLEMENTADA
-# =============================================================================
-# Vai incluir:
-#   - Exportação para .parquet (formato final, mais performático que .csv)
-#   - Dicionário de dados formal (documento separado, já com rascunho pronto
-#     no mapa_projeto_datapaper.md)
-#   - Publicação no Zenodo com DOI
-#   - Licenciamento CC-BY 4.0
-#   - README.md do repositório (GitHub + Zenodo)
-# #############################################################################
+#parte 6 fase 5: carga e publicação ainda não implementada
+#vai incluir:
+#exportação para .parquet (formato final, mais performático que .csv)
+#dicionário de dados formal (documento separado, já com rascunho pronto
+#no mapa_projeto_datapaper.md)
+#publicação no zenodo com doi
+#licenciamento cc-by 4.0
+#readme.md do repositório (github + zenodo)
