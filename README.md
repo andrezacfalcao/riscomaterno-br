@@ -34,7 +34,7 @@ O dataset consolidado e enriquecido está publicado e permanentemente arquivado 
 O pipeline de engenharia de dados do projeto segue a arquitetura Medallion para garantir a rastreabilidade e integridade das informações extraídas:
 
 | Camada | Descrição do Dado | Fontes / Processamento |
-| :--- | :--- | :--- | :--- |
+| :--- | :--- | :--- |
 | 🟤 **Bronze** *(Raw)* | Dados exatamente como saem do DATASUS (arquivos `.dbc` brutos) | Extração do SINASC, SIM e CNES via pacote R `microdatasus` (27 UFs) 
 | ⚪ **Prata** *(Silver)* | Dados limpos, tipados e padronizados a nível de registro individual | Filtragem de inconsistências, tratamento de dados ignorados e padronização temporal 
 | 🟡 **Ouro** *(Gold)* | Dados agregados, cruzados e enriquecidos a nível de **município-ano** | Agregação espacial (IBGE 6 d.), cálculo da RMM e join final de infraestrutura (CNES) 
